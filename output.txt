@@ -1,0 +1,10 @@
+total 28
+drwxrwxrwx 1 nedmac nedmac  4096 Nov 15 22:06 .
+drwxrwxrwx 1 nedmac nedmac  4096 Nov 15 14:28 ..
+drwxrwxrwx 1 nedmac nedmac  4096 Nov 15 22:08 .git
+-rwxrwxrwx 1 nedmac nedmac    14 Nov 15 16:34 .gitignore
+drwxrwxrwx 1 nedmac nedmac  4096 Nov 15 16:12 .vscode
+-rwxrwxrwx 1 nedmac nedmac   207 Nov 15 16:33 README.md
+-rwxrwxrwx 1 nedmac nedmac 17240 Nov 15 22:06 main
+-rwxrwxrwx 1 nedmac nedmac  5698 Nov 15 22:04 main.c
+-rwxrwxrwx 1 nedmac nedmac     0 Nov 15  2026 output.txt

@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 int shell_cd(char** args);
 int shell_help(char** args);
@@ -177,9 +178,42 @@ int shell_launch(char** args)
     pid_t pid, wpid;
     int status;
 
+    int i = 0;
+    char* arg = args[i];
+    char* fileName = NULL;
+    while (arg != NULL)
+    {
+        if (strcmp(arg, ">") == 0)
+        {
+            if (args[i + 1] == NULL)
+            {
+                fprintf(stderr, "Expected file name after '>'\n");
+                return 1;
+            }
+
+            fileName = args[i + 1];
+            break;
+        }
+        arg = args[++i];
+    }
+
     pid = fork();
     if (pid == 0)
     {
+        if (fileName != NULL)
+        {
+            int fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd == -1)
+                perror("Error opening file\n");
+
+            if (dup2(fd, STDOUT_FILENO) < 0)
+                perror("dup2");
+
+            args[i] = NULL;
+
+            close(fd);
+        }
+
         // Child process
         if (execvp(args[0], args) == -1)
             perror("shell");
