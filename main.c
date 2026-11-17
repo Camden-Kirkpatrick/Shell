@@ -171,7 +171,9 @@ char** shell_split_line(char* line)
     return tokens;
 }
 
-int handle_redirection(char** args, char** fileName, int* op)
+
+
+int handle_redirection(char** args, char** fileName, char* op)
 {
     int i = 0;
     char* arg = args[i];
@@ -185,9 +187,9 @@ int handle_redirection(char** args, char** fileName, int* op)
                 return 1;
             }
             else if (strcmp(arg, ">") == 0)
-                *op = 0;
+                *op = 't';
             else
-                *op = 1;
+                *op = 'a';
 
             *fileName = args[i + 1];
             args[i] = NULL;
@@ -200,13 +202,14 @@ int handle_redirection(char** args, char** fileName, int* op)
 }
 
 
+
 int shell_launch(char** args)
 {
     pid_t pid, wpid;
     int status;
 
     char* fileName = NULL;
-    int op; // 0 = '>'   1 = '>>'
+    char op; // t = truncate, a = append
     if (handle_redirection(args, &fileName, &op) == 1)
         return 1;
 
@@ -216,11 +219,11 @@ int shell_launch(char** args)
         if (fileName != NULL)
         {
             int fd;
+            int flags = O_WRONLY | O_CREAT;
+            flags |= (op == 't') ? O_TRUNC : O_APPEND;
+
             // Get the file descriptor from the file
-            if (op == 0)
-                fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            else
-                fd = open(fileName, O_WRONLY | O_CREAT | O_APPEND, 0644);
+            fd = open(fileName, flags, 0644);
 
             if (fd == -1)
                 perror("Error opening file\n");
