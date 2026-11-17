@@ -171,16 +171,10 @@ char** shell_split_line(char* line)
     return tokens;
 }
 
-
-
-int shell_launch(char** args)
+int handle_redirection(char** args, char** fileName)
 {
-    pid_t pid, wpid;
-    int status;
-
     int i = 0;
     char* arg = args[i];
-    char* fileName = NULL;
     while (arg != NULL)
     {
         if (strcmp(arg, ">") == 0)
@@ -191,25 +185,40 @@ int shell_launch(char** args)
                 return 1;
             }
 
-            fileName = args[i + 1];
-            break;
+            *fileName = args[i + 1];
+            args[i] = NULL;
+            return 0;
+            //break;
         }
         arg = args[++i];
     }
+
+    return 0;
+}
+
+
+int shell_launch(char** args)
+{
+    pid_t pid, wpid;
+    int status;
+
+    char* fileName = NULL;
+    if (handle_redirection(args, &fileName) == 1)
+        return 1;
 
     pid = fork();
     if (pid == 0)
     {
         if (fileName != NULL)
         {
+            // Get the file descriptor from the file
             int fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0644);
             if (fd == -1)
                 perror("Error opening file\n");
 
+            // Write to the file instead of stdout
             if (dup2(fd, STDOUT_FILENO) < 0)
                 perror("dup2");
-
-            args[i] = NULL;
 
             close(fd);
         }
