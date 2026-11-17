@@ -171,24 +171,27 @@ char** shell_split_line(char* line)
     return tokens;
 }
 
-int handle_redirection(char** args, char** fileName)
+int handle_redirection(char** args, char** fileName, int* op)
 {
     int i = 0;
     char* arg = args[i];
     while (arg != NULL)
     {
-        if (strcmp(arg, ">") == 0)
+        if (strcmp(arg, ">") == 0 || strcmp(arg, ">>") == 0)
         {
             if (args[i + 1] == NULL)
             {
                 fprintf(stderr, "Expected file name after '>'\n");
                 return 1;
             }
+            else if (strcmp(arg, ">") == 0)
+                *op = 0;
+            else
+                *op = 1;
 
             *fileName = args[i + 1];
             args[i] = NULL;
             return 0;
-            //break;
         }
         arg = args[++i];
     }
@@ -203,7 +206,8 @@ int shell_launch(char** args)
     int status;
 
     char* fileName = NULL;
-    if (handle_redirection(args, &fileName) == 1)
+    int op; // 0 = '>'   1 = '>>'
+    if (handle_redirection(args, &fileName, &op) == 1)
         return 1;
 
     pid = fork();
@@ -211,8 +215,13 @@ int shell_launch(char** args)
     {
         if (fileName != NULL)
         {
+            int fd;
             // Get the file descriptor from the file
-            int fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (op == 0)
+                fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            else
+                fd = open(fileName, O_WRONLY | O_CREAT | O_APPEND, 0644);
+
             if (fd == -1)
                 perror("Error opening file\n");
 
