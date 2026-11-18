@@ -179,17 +179,19 @@ int handle_redirection(char** args, char** fileName, char* op)
     char* arg = args[i];
     while (arg != NULL)
     {
-        if (strcmp(arg, ">") == 0 || strcmp(arg, ">>") == 0)
+        if (strcmp(arg, ">") == 0 || strcmp(arg, ">>") == 0 || strcmp(arg, "<") == 0)
         {
             if (args[i + 1] == NULL)
             {
-                fprintf(stderr, "Expected file name after '>'\n");
+                fprintf(stderr, "Expected file name after redirection operator\n");
                 return 1;
             }
             else if (strcmp(arg, ">") == 0)
                 *op = 't';
-            else
+            else if (strcmp(arg, ">>") == 0)
                 *op = 'a';
+            else
+                *op = 'i';
 
             *fileName = args[i + 1];
             args[i] = NULL;
@@ -209,35 +211,48 @@ int shell_launch(char** args)
     int status;
 
     char* fileName = NULL;
-    char op; // t = truncate, a = append
+    char op; // i = input, t = truncate, a = append
     if (handle_redirection(args, &fileName, &op) == 1)
         return 1;
 
     pid = fork();
+    // Child process
     if (pid == 0)
     {
         if (fileName != NULL)
         {
             int fd;
-            int flags = O_WRONLY | O_CREAT;
-            flags |= (op == 't') ? O_TRUNC : O_APPEND;
+            int flags;
+            
+            if (op == 'i')
+                flags = O_RDONLY;
+            else
+            {
+                flags = O_WRONLY | O_CREAT;
+                flags |= (op == 't') ? O_TRUNC : O_APPEND;
+            }
 
             // Get the file descriptor from the file
             fd = open(fileName, flags, 0644);
 
             if (fd == -1)
-                perror("Error opening file\n");
+            {
+                perror("Error opening file");
+                exit(EXIT_FAILURE);
+            }
 
             // Write to the file instead of stdout
-            if (dup2(fd, STDOUT_FILENO) < 0)
+            if (dup2(fd, (op == 'i') ? STDIN_FILENO : STDOUT_FILENO) < 0)
+            {
                 perror("dup2");
+                exit(EXIT_FAILURE);
+            }
 
             close(fd);
         }
-
-        // Child process
         if (execvp(args[0], args) == -1)
             perror("shell");
+
         exit(EXIT_FAILURE);
     }
     else if (pid < 0)
