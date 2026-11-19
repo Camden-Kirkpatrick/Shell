@@ -81,6 +81,8 @@ int shell_execute(char** args)
     return shell_launch(args);
 }
 
+
+
 #define SHELL_RL_BUFSIZE 1024
 char* shell_read_line(void)
 {
@@ -172,11 +174,13 @@ char** shell_split_line(char* line)
 }
 
 
-
-int handle_redirection(char** args, char** fileName, char* op)
+// Allow the user to use <, >, and >>
+int handle_redirection(char** args, char** inputFileName, char** outputFileName, char* outputOp)
 {
     int i = 0;
     char* arg = args[i];
+    int firstOpIdx = -1; // first index we see <, >, or >>
+
     while (arg != NULL)
     {
         if (strcmp(arg, ">") == 0 || strcmp(arg, ">>") == 0 || strcmp(arg, "<") == 0)
@@ -187,20 +191,67 @@ int handle_redirection(char** args, char** fileName, char* op)
                 return 1;
             }
             else if (strcmp(arg, ">") == 0)
-                *op = 't';
+            {
+                *outputOp = 't';
+                *outputFileName = args[i + 1];
+            }
             else if (strcmp(arg, ">>") == 0)
-                *op = 'a';
-            else
-                *op = 'i';
+            {
+                *outputOp = 'a';
+                *outputFileName = args[i + 1];
+            }
+            else // arg == '<'
+                *inputFileName = args[i + 1];
 
-            *fileName = args[i + 1];
-            args[i] = NULL;
-            return 0;
+            if (firstOpIdx == -1)
+                firstOpIdx = i;
         }
         arg = args[++i];
     }
 
+    // Strip redirection operators/filenames from args so execvp only sees the command and its real arguments
+    if (firstOpIdx != -1)
+        args[firstOpIdx] = NULL;
+
     return 0;
+}
+
+
+
+// Check to see if the user is using I/O redirection 
+void apply_redirection(char* fileName, char outputOp)
+{
+    if (fileName != NULL)
+    {
+        int fd;
+        int flags;
+
+        if (outputOp != '\0')
+        {
+            flags = O_WRONLY | O_CREAT;
+            flags |= (outputOp == 't') ? O_TRUNC : O_APPEND;
+        }
+        else
+            flags = O_RDONLY;
+
+        // Get the file descriptor from the file
+        fd = open(fileName, flags, 0644);
+
+        if (fd == -1)
+        {
+            perror("Error opening file");
+            exit(EXIT_FAILURE);
+        }
+
+        // Write to the file instead of stdout
+        if (dup2(fd, (outputOp != '\0') ? STDOUT_FILENO : STDIN_FILENO) < 0)
+        {
+            perror("dup2");
+            exit(EXIT_FAILURE);
+        }
+
+        close(fd);
+    }
 }
 
 
@@ -210,46 +261,20 @@ int shell_launch(char** args)
     pid_t pid, wpid;
     int status;
 
-    char* fileName = NULL;
-    char op; // i = input, t = truncate, a = append
-    if (handle_redirection(args, &fileName, &op) == 1)
+    char* inputFileName = NULL;
+    char* outputFileName = NULL;
+    char outputOp; // t = truncate, a = append
+
+    if (handle_redirection(args, &inputFileName, &outputFileName, &outputOp) == 1)
         return 1;
 
     pid = fork();
     // Child process
     if (pid == 0)
     {
-        if (fileName != NULL)
-        {
-            int fd;
-            int flags;
-            
-            if (op == 'i')
-                flags = O_RDONLY;
-            else
-            {
-                flags = O_WRONLY | O_CREAT;
-                flags |= (op == 't') ? O_TRUNC : O_APPEND;
-            }
+        apply_redirection(outputFileName, outputOp);
+        apply_redirection(inputFileName, '\0');
 
-            // Get the file descriptor from the file
-            fd = open(fileName, flags, 0644);
-
-            if (fd == -1)
-            {
-                perror("Error opening file");
-                exit(EXIT_FAILURE);
-            }
-
-            // Write to the file instead of stdout
-            if (dup2(fd, (op == 'i') ? STDIN_FILENO : STDOUT_FILENO) < 0)
-            {
-                perror("dup2");
-                exit(EXIT_FAILURE);
-            }
-
-            close(fd);
-        }
         if (execvp(args[0], args) == -1)
             perror("shell");
 
@@ -277,7 +302,7 @@ void shell_loop(void)
 {
     char* line;
     char** args;
-    int status;
+    int status; // 1 = continue, 0 = stop
 
     do
     {
@@ -291,7 +316,9 @@ void shell_loop(void)
     } while (status);
 }
 
-int main(int arg, char* argv[])
+
+
+int main(int arg, char** argv)
 {
     shell_loop();
 
