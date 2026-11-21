@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -64,6 +66,81 @@ int shell_exit(char** args)
 
 
 
+double parse_arithmetic_expression(char** args)
+{
+    double answer = 0;
+    double curNum = 0;
+    char curOp = '+';
+    int i = 0;
+
+    do
+    {
+        // Ex. "9 +"
+        if (args[i] == NULL)
+        {
+            fprintf(stderr, "shell: incomplete expression\n");
+            break;
+        }
+
+        char* endPtr;
+        errno = 0; 
+
+        curNum = strtod(args[i], &endPtr);
+
+        if (endPtr == args[i])
+        {
+            fprintf(stderr, "shell: no numeric digits found, conversion failed\n");
+            break;
+        }
+        else if (errno == ERANGE)
+        {
+            fprintf(stderr, "shell: value out of range for a double\n");
+            break;
+        }
+        else if (*endPtr != '\0')
+        {
+            fprintf(stderr, "shell: partial conversion (%f), stopped at '%s'\n", curNum, endPtr);
+            break;
+        }
+
+        switch (curOp)
+        {
+            case '+':
+                answer += curNum;
+                break;
+            case '-':
+                answer -= curNum;
+                break;
+            case '*':
+                answer *= curNum;
+                break;
+            case '/':
+                answer /= curNum;
+                break;
+            default:
+                break;
+        }
+
+        // No more operators, so we are done
+        if (args[i + 1] == NULL)
+            break;
+
+        curOp = args[i + 1][0];
+        // Ex. "25 5"
+        if (curOp != '+' && curOp != 
+            '-' && curOp != '*' && curOp != '/')
+        {
+            fprintf(stderr, "shell: expected an operator, found '%c'\n", curOp);
+            break;
+        }
+        
+        i += 2;
+    } while (1);
+
+    return answer;
+}
+
+
 int shell_execute(char** args)
 {
     if (args[0] == NULL)
@@ -75,6 +152,24 @@ int shell_execute(char** args)
         // See if the command entered is a builtin command
         if (strcmp(args[0], builtin_str[i]) == 0)
             return (*builtin_func[i])(args);
+    }
+
+    char* endPtr;
+    errno = 0; 
+
+    double value = strtod(args[0], &endPtr);
+    double answer = 0;
+
+    if (errno == ERANGE)
+    {
+        fprintf(stderr, "shell: value out of range for a double\n");
+        return 1;
+    }
+    else if (*endPtr == '\0')
+    {
+        answer = parse_arithmetic_expression(args);
+        printf("= %.3lf\n", answer);
+        return 1;
     }
 
     // Not a builtin command
@@ -174,6 +269,7 @@ char** shell_split_line(char* line)
 }
 
 
+
 // Allow the user to use <, >, and >>
 int handle_redirection(char** args, char** inputFileName, char** outputFileName, char* outputOp)
 {
@@ -243,7 +339,7 @@ void apply_redirection(char* fileName, char outputOp)
             exit(EXIT_FAILURE);
         }
 
-        // Write to the file instead of stdout
+        // Write/read to the file instead of stdout/stdin
         if (dup2(fd, (outputOp != '\0') ? STDOUT_FILENO : STDIN_FILENO) < 0)
         {
             perror("dup2");
