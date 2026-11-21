@@ -66,9 +66,8 @@ int shell_exit(char** args)
 
 
 
-double parse_arithmetic_expression(char** args)
+double parse_arithmetic_expression(char** args, double* answer)
 {
-    double answer = 0;
     double curNum = 0;
     char curOp = '+';
     int i = 0;
@@ -79,7 +78,7 @@ double parse_arithmetic_expression(char** args)
         if (args[i] == NULL)
         {
             fprintf(stderr, "shell: incomplete expression\n");
-            break;
+            return 1;
         }
 
         char* endPtr;
@@ -90,38 +89,38 @@ double parse_arithmetic_expression(char** args)
         if (endPtr == args[i])
         {
             fprintf(stderr, "shell: no numeric digits found, conversion failed\n");
-            break;
+            return 1;
         }
         else if (errno == ERANGE)
         {
             fprintf(stderr, "shell: value out of range for a double\n");
-            break;
+            return 1;
         }
         else if (*endPtr != '\0')
         {
             fprintf(stderr, "shell: partial conversion (%f), stopped at '%s'\n", curNum, endPtr);
-            break;
+            return 1;
         }
         else if (curOp == '/' && curNum == 0)
         {
             fprintf(stderr, "shell: division by zero is not allowed\n");
-            answer = 0;
-            break;
+            *answer = 0;
+            return 1;
         }
 
         switch (curOp)
         {
             case '+':
-                answer += curNum;
+                *answer += curNum;
                 break;
             case '-':
-                answer -= curNum;
+                *answer -= curNum;
                 break;
             case '*':
-                answer *= curNum;
+                *answer *= curNum;
                 break;
             case '/':
-                answer /= curNum;
+                *answer /= curNum;
                 break;
             default:
                 break;
@@ -137,13 +136,13 @@ double parse_arithmetic_expression(char** args)
             '-' && curOp != '*' && curOp != '/')
         {
             fprintf(stderr, "shell: expected an operator, found '%c'\n", curOp);
-            break;
+            return 1;
         }
         
         i += 2;
     } while (1);
 
-    return answer;
+    return 0;
 }
 
 
@@ -173,8 +172,8 @@ int shell_execute(char** args)
     }
     else if (*endPtr == '\0')
     {
-        answer = parse_arithmetic_expression(args);
-        printf("= %.3lf\n", answer);
+        if(parse_arithmetic_expression(args, &answer) == 0)
+            printf("= %.3lf\n", answer);
         return 1;
     }
 
@@ -323,36 +322,35 @@ int handle_redirection(char** args, char** inputFileName, char** outputFileName,
 // Check to see if the user is using I/O redirection 
 void apply_redirection(char* fileName, char outputOp)
 {
-    if (fileName != NULL)
+    // No <, >, or >> were found in args
+    if (fileName == NULL)
+        return;
+
+    int fd;
+    int flags;
+
+    if (outputOp != '\0')
     {
-        int fd;
-        int flags;
+        flags = O_WRONLY | O_CREAT;
+        flags |= (outputOp == 't') ? O_TRUNC : O_APPEND;
+    }
+    else
+        flags = O_RDONLY;
 
-        if (outputOp != '\0')
-        {
-            flags = O_WRONLY | O_CREAT;
-            flags |= (outputOp == 't') ? O_TRUNC : O_APPEND;
-        }
-        else
-            flags = O_RDONLY;
+    // Get the file descriptor from the file
+    fd = open(fileName, flags, 0644);
 
-        // Get the file descriptor from the file
-        fd = open(fileName, flags, 0644);
+    if (fd == -1)
+    {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
 
-        if (fd == -1)
-        {
-            perror("Error opening file");
-            exit(EXIT_FAILURE);
-        }
-
-        // Write/read to the file instead of stdout/stdin
-        if (dup2(fd, (outputOp != '\0') ? STDOUT_FILENO : STDIN_FILENO) < 0)
-        {
-            perror("dup2");
-            exit(EXIT_FAILURE);
-        }
-
-        close(fd);
+    // Write/read to the file instead of stdout/stdin
+    if (dup2(fd, (outputOp != '\0') ? STDOUT_FILENO : STDIN_FILENO) < 0)
+    {
+        perror("dup2");
+        exit(EXIT_FAILURE);
     }
 }
 
