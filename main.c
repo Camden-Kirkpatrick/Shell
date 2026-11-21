@@ -102,6 +102,12 @@ double parse_arithmetic_expression(char** args)
             fprintf(stderr, "shell: partial conversion (%f), stopped at '%s'\n", curNum, endPtr);
             break;
         }
+        else if (curOp == '/' && curNum == 0)
+        {
+            fprintf(stderr, "shell: division by zero is not allowed\n");
+            answer = 0;
+            break;
+        }
 
         switch (curOp)
         {
