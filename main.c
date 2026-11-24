@@ -152,7 +152,7 @@ int evaluate_mul_div(char** args)
         if (finishedOp)
         {
             char* newToken = malloc(64);
-            snprintf(newToken, 64, "%g", result);
+            snprintf(newToken, 64, "%.17g", result);
 
             delete_at_index(args, i);
             delete_at_index(args, i - 1);
@@ -300,7 +300,7 @@ int shell_execute(char** args)
     else if (*endPtr == '\0')
     {
         if(parse_arithmetic_expression(args, &answer) == 0)
-            printf("= %.3f\n", answer);
+            printf("= %.10f\n", answer);
         return 1;
     }
 
