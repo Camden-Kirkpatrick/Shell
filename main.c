@@ -269,11 +269,6 @@ int parse_arithmetic_expression(char** args, double* answer)
     if (evaluate_mul_div(args) != 0)
         return 1;
 
-    for (int i = 0; args[i] != NULL; i++)
-    {
-        printf("%s\n", args[i]);
-    }
-    
     return evaluate_add_sub(args, answer);
 }
 
