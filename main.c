@@ -66,9 +66,118 @@ int shell_exit(char** args)
 
 
 
+void delete_at_index(char** args, int index)
+{
+    for (int i = index; args[i] != NULL; i++)
+    {
+        args[i] = args[i + 1];
+    }
+}
+
+
+
 int evaluate_mul_div(char** args)
 {
-    // TODO
+    double result = 0;
+    double curNum = 0;
+    char curOp = '+';
+    int i = 0;
+    int finishedOp = 0;
+
+    do
+    {
+        // Ex. "9 +"
+        if (args[i] == NULL)
+        {
+            fprintf(stderr, "shell: incomplete expression\n");
+            return 1;
+        }
+
+        char* endPtr;
+        errno = 0; 
+
+        curNum = strtod(args[i], &endPtr);
+ 
+        if (endPtr == args[i])
+        {
+            fprintf(stderr, "shell: no numeric digits found, conversion failed\n");
+            return 1;
+        }
+        else if (errno == ERANGE)
+        {
+            fprintf(stderr, "shell: value out of range for a double\n");
+            return 1;
+        }
+        else if (*endPtr != '\0')
+        {
+            fprintf(stderr, "shell: partial conversion (%f), stopped at '%s'\n", curNum, endPtr);
+            return 1;
+        }
+        else if (curOp == '/' && curNum == 0)
+        {
+            fprintf(stderr, "shell: division by zero is not allowed\n");
+            return 1;
+        }
+
+        switch (curOp)
+        {
+            case '*':
+                result *= curNum;
+                finishedOp = 1;
+                break;
+            case '/':
+                result /= curNum;
+                finishedOp = 1;
+                break;
+            default:
+                result = curNum;
+                break;
+        }
+
+
+        // 0 1 2 3 4
+        // 3 + 2 * 6       i = 4
+
+        // delete_at_index(args, i (4))
+        // 0 1 2 3
+        // 3 + 2 *
+
+        // delete_at_index(args, i - 1 (3))
+        // 0 1 2
+        // 3 + 2
+
+        // args[i (4) - 2] = newToken
+        // 0 1 2
+        // 3 + newToken
+        if (finishedOp)
+        {
+            char* newToken = malloc(64);
+            snprintf(newToken, 64, "%g", result);
+
+            delete_at_index(args, i);
+            delete_at_index(args, i - 1);
+
+            args[i - 2] = newToken;
+            i -= 2;
+        }
+
+        finishedOp = 0;
+
+        // No more operators, so we are done
+        if (args[i + 1] == NULL)
+            break;
+
+        curOp = args[i + 1][0];
+        // Ex. "25 5"
+        if (curOp != '+' && curOp != '-' &&
+            curOp != '*' && curOp != '/')
+        {
+            fprintf(stderr, "shell: expected an operator, found '%c'\n", curOp);
+            return 1;
+        }
+
+        i += 2;
+    } while (1);
     return 0;
 }
 
@@ -76,8 +185,79 @@ int evaluate_mul_div(char** args)
 
 int evaluate_add_sub(char** args, double* answer)
 {
-    // Similar to original parse_arithmetic_expression function
-    // TODO
+    double curNum = 0;
+    char curOp = '+';
+    int i = 0;
+
+    do
+    {
+        // Ex. "9 +"
+        if (args[i] == NULL)
+        {
+            fprintf(stderr, "shell: incomplete expression\n");
+            return 1;
+        }
+
+        char* endPtr;
+        errno = 0; 
+
+        curNum = strtod(args[i], &endPtr);
+
+        if (endPtr == args[i])
+        {
+            fprintf(stderr, "shell: no numeric digits found, conversion failed\n");
+            return 1;
+        }
+        else if (errno == ERANGE)
+        {
+            fprintf(stderr, "shell: value out of range for a double\n");
+            return 1;
+        }
+        else if (*endPtr != '\0')
+        {
+            fprintf(stderr, "shell: partial conversion (%f), stopped at '%s'\n", curNum, endPtr);
+            return 1;
+        }
+        else if (curOp == '/' && curNum == 0)
+        {
+            fprintf(stderr, "shell: division by zero is not allowed\n");
+            *answer = 0;
+            return 1;
+        }
+
+        switch (curOp)
+        {
+            case '+':
+                *answer += curNum;
+                break;
+            case '-':
+                *answer -= curNum;
+                break;
+            case '*':
+                *answer *= curNum;
+                break;
+            case '/':
+                *answer /= curNum;
+                break;
+            default:
+                break;
+        }
+
+        // No more operators, so we are done
+        if (args[i + 1] == NULL)
+            break;
+
+        curOp = args[i + 1][0];
+        // Ex. "25 5"
+        if (curOp != '+' && curOp != 
+            '-' && curOp != '*' && curOp != '/')
+        {
+            fprintf(stderr, "shell: expected an operator, found '%c'\n", curOp);
+            return 1;
+        }
+
+        i += 2;
+    } while (1);
     return 0;
 }
 
@@ -88,82 +268,13 @@ int parse_arithmetic_expression(char** args, double* answer)
     // Multiply and divide before addition and subtraction
     if (evaluate_mul_div(args) != 0)
         return 1;
+
+    for (int i = 0; args[i] != NULL; i++)
+    {
+        printf("%s\n", args[i]);
+    }
     
-    return parse_arithmetic_expression(args, answer);
-
-    // double curNum = 0;
-    // char curOp = '+';
-    // int i = 0;
-
-    // do
-    // {
-    //     // Ex. "9 +"
-    //     if (args[i] == NULL)
-    //     {
-    //         fprintf(stderr, "shell: incomplete expression\n");
-    //         return 1;
-    //     }
-
-    //     char* endPtr;
-    //     errno = 0; 
-
-    //     curNum = strtod(args[i], &endPtr);
-
-    //     if (endPtr == args[i])
-    //     {
-    //         fprintf(stderr, "shell: no numeric digits found, conversion failed\n");
-    //         return 1;
-    //     }
-    //     else if (errno == ERANGE)
-    //     {
-    //         fprintf(stderr, "shell: value out of range for a double\n");
-    //         return 1;
-    //     }
-    //     else if (*endPtr != '\0')
-    //     {
-    //         fprintf(stderr, "shell: partial conversion (%f), stopped at '%s'\n", curNum, endPtr);
-    //         return 1;
-    //     }
-    //     else if (curOp == '/' && curNum == 0)
-    //     {
-    //         fprintf(stderr, "shell: division by zero is not allowed\n");
-    //         *answer = 0;
-    //         return 1;
-    //     }
-
-    //     switch (curOp)
-    //     {
-    //         case '+':
-    //             *answer += curNum;
-    //             break;
-    //         case '-':
-    //             *answer -= curNum;
-    //             break;
-    //         case '*':
-    //             *answer *= curNum;
-    //             break;
-    //         case '/':
-    //             *answer /= curNum;
-    //             break;
-    //         default:
-    //             break;
-    //     }
-
-    //     // No more operators, so we are done
-    //     if (args[i + 1] == NULL)
-    //         break;
-
-    //     curOp = args[i + 1][0];
-    //     // Ex. "25 5"
-    //     if (curOp != '+' && curOp != 
-    //         '-' && curOp != '*' && curOp != '/')
-    //     {
-    //         fprintf(stderr, "shell: expected an operator, found '%c'\n", curOp);
-    //         return 1;
-    //     }
-
-    //     i += 2;
-    // } while (1);
+    return evaluate_add_sub(args, answer);
 }
 
 
@@ -193,11 +304,8 @@ int shell_execute(char** args)
     }
     else if (*endPtr == '\0')
     {
-        if(parse_arithmetic_expression(args, &answer, 1) == 0)
-        {
-            if(parse_arithmetic_expression(args, &answer, 0) == 0)
-                printf("= %.3f\n", answer);
-        }
+        if(parse_arithmetic_expression(args, &answer) == 0)
+            printf("= %.3f\n", answer);
         return 1;
     }
 
